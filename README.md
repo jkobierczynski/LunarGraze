@@ -26,6 +26,14 @@ spherical-Moon model, and the map-tile saga that ended in a one-line Qt
 signal/slot bug. Worth reading before touching `src/grazecore.cpp` or
 `src/mapview.cpp`.
 
+## Made with Claude
+
+Made with Claude Sonnet 5 High
+
+## Screenshots
+
+![LunarGraze](LunarGraze.jpg)
+
 ## Quick start (Linux)
 
 ```
