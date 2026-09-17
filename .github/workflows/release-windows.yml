@@ -32,17 +32,37 @@ jobs:
           arch: win64_msvc2019_64
           cache: true
 
+      # Ninja instead of an explicit "-G Visual Studio NN 20XX" generator:
+      # pinning a specific VS generator name breaks outright the moment
+      # GitHub's windows-latest image moves to a different bundled VS
+      # version (exactly what happened here -- "could not find any
+      # instance of Visual Studio" the first time this workflow ran).
+      # Ninja just needs a cl.exe on PATH, so it doesn't care which VS
+      # version that is; msvc-dev-cmd finds whatever's installed and wires
+      # up the environment for it.
+      - name: Set up MSVC build environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Not reliably preinstalled on windows-latest -- it was silently
+      # dropped from the runner image once already (actions/runner-images
+      # #8343). pip's wheel is the simplest way to pin it ourselves instead
+      # of hoping it's still there.
+      - name: Install Ninja
+        run: pip install ninja
+
       - name: Configure (CMake)
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G Ninja
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --parallel
 
       - name: Smoke test graze_core_test (headless, no Qt needed)
         shell: pwsh
         run: |
-          Copy-Item hygdata_v41.csv,area_eph_2025_2030.txt build\Release\
-          Push-Location build\Release
+          Copy-Item hygdata_v41.csv,area_eph_2025_2030.txt build\
+          Push-Location build
           .\graze_core_test.exe --lat 50.85 --lon 4.35 --radius-km 100 --mag-limit 6 `
             --start 2026-01-01 --end 2026-02-01 --catalog hygdata_v41.csv --eph area_eph_2025_2030.txt
           if ($LASTEXITCODE -ne 0) { throw "graze_core_test exited with code $LASTEXITCODE" }
@@ -53,7 +73,7 @@ jobs:
         run: |
           $dist = "dist\LunarGraze-windows-x64"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
-          Copy-Item build\Release\LunarGraze.exe $dist\
+          Copy-Item build\LunarGraze.exe $dist\
           & "$env:Qt6_DIR\bin\windeployqt.exe" "$dist\LunarGraze.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler
           Copy-Item hygdata_v41.csv,area_eph_2025_2030.txt,README.md,LICENSE $dist\
           Compress-Archive -Path $dist -DestinationPath LunarGraze-windows-x64.zip
