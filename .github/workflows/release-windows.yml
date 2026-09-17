@@ -1,0 +1,71 @@
+name: Windows release
+
+# Builds a ready-to-run LunarGraze.exe (statically linked against graze_core,
+# with the Qt6 DLLs it needs bundled alongside it via windeployqt) on every
+# push/PR for CI verification, and additionally attaches the packaged zip to
+# a GitHub Release when a "v*" tag is pushed (e.g. v1.0.0).
+#
+# This exists because the LunarGraze source is portable, dependency-light
+# C++/Qt with no POSIX-only calls, but actually producing a Windows build
+# needs a real Windows toolchain + Qt-for-Windows -- this workflow supplies
+# both via a Windows GitHub Actions runner, so nobody has to install Qt
+# locally just to get a working .exe.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.7.*"
+          arch: win64_msvc2019_64
+          cache: true
+
+      - name: Configure (CMake)
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Smoke test graze_core_test (headless, no Qt needed)
+        shell: pwsh
+        run: |
+          Copy-Item hygdata_v41.csv,area_eph_2025_2030.txt build\Release\
+          Push-Location build\Release
+          .\graze_core_test.exe --lat 50.85 --lon 4.35 --radius-km 100 --mag-limit 6 `
+            --start 2026-01-01 --end 2026-02-01 --catalog hygdata_v41.csv --eph area_eph_2025_2030.txt
+          if ($LASTEXITCODE -ne 0) { throw "graze_core_test exited with code $LASTEXITCODE" }
+          Pop-Location
+
+      - name: Package (windeployqt + bundled data)
+        shell: pwsh
+        run: |
+          $dist = "dist\LunarGraze-windows-x64"
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Copy-Item build\Release\LunarGraze.exe $dist\
+          & "$env:Qt6_DIR\bin\windeployqt.exe" "$dist\LunarGraze.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler
+          Copy-Item hygdata_v41.csv,area_eph_2025_2030.txt,README.md,LICENSE $dist\
+          Compress-Archive -Path $dist -DestinationPath LunarGraze-windows-x64.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LunarGraze-windows-x64
+          path: LunarGraze-windows-x64.zip
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LunarGraze-windows-x64.zip

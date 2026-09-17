@@ -49,6 +49,11 @@ if(Qt6_FOUND)
     if(NOT MSVC)
         target_compile_options(LunarGraze PRIVATE -Wall -Wextra -O2)
     endif()
+    if(WIN32)
+        # Windows GUI subsystem -- without this, launching LunarGraze.exe
+        # also pops up a blank console window behind the actual window.
+        set_target_properties(LunarGraze PROPERTIES WIN32_EXECUTABLE TRUE)
+    endif()
 else()
     message(STATUS "Qt6 (Widgets+Network) not found -- LunarGraze target skipped; "
                     "graze_core_test still builds. Install e.g. 'qt6-base-dev' "

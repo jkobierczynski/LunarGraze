@@ -283,6 +283,7 @@ LunarGraze/
                            no Qt -- used to verify graze_core against
                            graze_finder.py) and LunarGraze (the Qt app,
                            built only if Qt6 Widgets+Network are found)
+  LICENSE                  GPL-3.0-or-later, full text
   gen_area_ephemeris.py    bakes the Moon+Sun ephemeris table (offline,
                            one-time/occasional; not needed at GUI runtime)
   hygdata_v41.csv          bundled star catalogue
@@ -318,4 +319,44 @@ diffed directly against each other.
   generator) and build from there; `graze_core` itself has no
   platform-specific code (it already builds cleanly as part of the
   original moon-graze engine's MinGW/static-link Windows build, see the
-  root `CMakeLists.txt`).
+  root `CMakeLists.txt`). `WIN32_EXECUTABLE` is set for the `LunarGraze`
+  target on Windows so launching it doesn't also open a console window.
+
+### Prebuilt Windows and Linux packages (CI)
+
+`.github/workflows/release-windows.yml` and `.github/workflows/release-linux.yml`
+build LunarGraze on a real Windows and Ubuntu runner respectively -- useful
+since the source itself is portable C++/Qt (no POSIX-only calls) but a
+genuine Windows build needs an actual Windows toolchain + Qt-for-Windows to
+produce. Both run automatically on every push/PR as a build-still-works
+check; push a `vX.Y.Z` tag and each also attaches its packaged archive to
+that GitHub Release:
+
+* **Windows**: `LunarGraze-windows-x64.zip` -- `LunarGraze.exe` plus every
+  Qt DLL it needs (via `windeployqt`), the bundled star catalogue and
+  ephemeris table, `README.md` and `LICENSE`. Unzip anywhere and run the
+  `.exe` directly; nothing else to install.
+* **Linux**: `LunarGraze-linux-x86_64.tar.gz` -- the built binaries, bundled
+  data files, and a `run.sh` wrapper (so it finds its data files regardless
+  of the directory you launch it from). This one does *not* bundle the Qt6
+  shared libraries themselves (unlike Windows, safely bundling Qt across
+  the diversity of Linux distros/glibc versions needs much heavier tooling
+  like AppImage/`linuxdeployqt`) -- it expects a Qt6 runtime already on the
+  system, the same one the "Quick start" section above has you install to
+  build from source (`qt6-base-dev` on Debian/Ubuntu, or the matching
+  runtime-only package if you'd rather not install the `-dev` headers).
+
+These workflows assume they're at the root of whatever repo LunarGraze
+lives in (matching how this directory is packaged -- self-contained, no
+sibling `moon-graze` checkout needed). If you nest this directory inside a
+larger repo instead, move `.github/workflows/` up to that repo's actual
+root and point the `checkout`/build steps at this subdirectory.
+
+## License
+
+GPL-3.0-or-later, same as the rest of `moon-graze` -- full text bundled in
+`LICENSE` in this directory (this package is self-contained, so it doesn't
+depend on the root repo's copy). Every source file carries an SPDX header.
+`gen_area_ephemeris.py` uses `jplephem` (Brandon Rhodes, BSD license) only
+to bake `area_eph_2025_2030.txt` offline; it isn't linked into the built
+program.

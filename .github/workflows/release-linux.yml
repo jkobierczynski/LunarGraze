@@ -1,0 +1,86 @@
+name: Linux release
+
+# Builds LunarGraze against the distro's Qt6 packages on every push/PR for
+# CI verification, and packages + attaches a ready-to-run tarball to a
+# GitHub Release when a "v*" tag is pushed (e.g. v1.0.0).
+#
+# Unlike the Windows build, this does NOT bundle the Qt6 shared libraries
+# themselves (that needs distro-matching, ABI-fragile tooling like
+# linuxdeployqt/AppImage, which trades a lot of moving parts for something
+# that only reliably works on the exact glibc/Qt combo it was built
+# against). Instead the package ships a small run.sh wrapper so it works
+# correctly from any working directory, and documents the one real
+# dependency: a Qt6 runtime already installed on the target system (the
+# same qt6-base-dev/qt6-qtbase-devel-adjacent runtime packages the README's
+# "Quick start" already asks Linux users to install to build from source).
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Qt6 + build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev cmake g++ libgl1-mesa-dev
+
+      - name: Configure (CMake)
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Smoke test (headless CLI + offscreen GUI)
+        run: |
+          cp hygdata_v41.csv area_eph_2025_2030.txt build/
+          cd build
+          ./graze_core_test --lat 50.85 --lon 4.35 --radius-km 100 --mag-limit 6 \
+            --start 2026-01-01 --end 2026-02-01 --catalog hygdata_v41.csv --eph area_eph_2025_2030.txt
+          QT_QPA_PLATFORM=offscreen timeout 8 ./LunarGraze &
+          pid=$!
+          sleep 3
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "GUI started OK"
+            kill "$pid"; wait "$pid" 2>/dev/null || true
+          else
+            wait "$pid"; code=$?
+            echo "GUI exited early with code $code"; exit 1
+          fi
+
+      - name: Package release folder
+        run: |
+          dist=dist/LunarGraze-linux-x86_64
+          mkdir -p "$dist"
+          cp build/LunarGraze build/graze_core_test "$dist"/
+          cp hygdata_v41.csv area_eph_2025_2030.txt README.md LICENSE "$dist"/
+          cat > "$dist/run.sh" <<'EOF'
+          #!/bin/sh
+          # Ensures LunarGraze finds its bundled data files (it looks for
+          # them as plain relative filenames) no matter what directory
+          # you launch this script from.
+          cd "$(dirname "$0")"
+          exec ./LunarGraze "$@"
+          EOF
+          chmod +x "$dist/run.sh" "$dist/LunarGraze" "$dist/graze_core_test"
+          tar -C dist -czf LunarGraze-linux-x86_64.tar.gz LunarGraze-linux-x86_64
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LunarGraze-linux-x86_64
+          path: LunarGraze-linux-x86_64.tar.gz
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LunarGraze-linux-x86_64.tar.gz
