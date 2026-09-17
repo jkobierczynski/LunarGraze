@@ -315,7 +315,16 @@ diffed directly against each other.
   steps (add `-DCMAKE_PREFIX_PATH=$(brew --prefix qt6)` if CMake can't find
   Qt on its own).
 * **Windows**: install Qt6 (the official online installer, MSVC or MinGW
-  generator) and build from there; `graze_core` itself has no
+  kit) and CMake, then build from a Developer Command Prompt/PowerShell
+  (so `cl.exe` is on `PATH`) with `cmake -G Ninja ..` -- prefer this over
+  `-G "Visual Studio 17 2022"` (or any other version-pinned VS generator
+  name): it breaks the moment your installed VS version doesn't match that
+  exact string, which is exactly what happened the first time
+  `release-windows.yml` (below) ran against a `windows-latest` runner whose
+  bundled VS version had moved on. If you do want VS project files instead
+  of Ninja, run `cmake -G "Visual Studio 17 2022" -A x64 ..` but only after
+  confirming that's the version you actually have (`vswhere` or the Visual
+  Studio Installer will tell you). `graze_core` itself has no
   platform-specific code (it already builds cleanly as part of the
   original moon-graze engine's MinGW/static-link Windows build, see the
   root `CMakeLists.txt`). `WIN32_EXECUTABLE` is set for the `LunarGraze`
