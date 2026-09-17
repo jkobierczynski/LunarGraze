@@ -315,7 +315,6 @@ diffed directly against each other.
   steps (add `-DCMAKE_PREFIX_PATH=$(brew --prefix qt6)` if CMake can't find
   Qt on its own).
 * **Windows**: install Qt6 (the official online installer, MSVC or MinGW
-  kit) and CMake, then `cmake -G "Visual Studio 17 2022" ..` (or the Ninja
   generator) and build from there; `graze_core` itself has no
   platform-specific code (it already builds cleanly as part of the
   original moon-graze engine's MinGW/static-link Windows build, see the
