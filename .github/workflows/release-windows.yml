@@ -21,6 +21,14 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    # softprops/action-gh-release needs write access to create/update the
+    # release and attach files -- without this, many repos' default
+    # GITHUB_TOKEN permissions are read-only and it fails with "Resource
+    # not accessible by integration" on the update-a-release call (as seen
+    # when this ran against an already-existing release the Linux job had
+    # just created for the same tag).
+    permissions:
+      contents: write
     steps:
       - name: Check out source
         uses: actions/checkout@v4

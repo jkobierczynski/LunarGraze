@@ -24,6 +24,10 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-24.04
+    # See the matching comment in release-windows.yml -- softprops/action-gh-release
+    # needs write access to create/update the release and attach files.
+    permissions:
+      contents: write
     steps:
       - name: Check out source
         uses: actions/checkout@v4
