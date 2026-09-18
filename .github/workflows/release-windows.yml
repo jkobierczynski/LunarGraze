@@ -74,7 +74,15 @@ jobs:
           $dist = "dist\LunarGraze-windows-x64"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
           Copy-Item build\LunarGraze.exe $dist\
-          & "$env:Qt6_DIR\bin\windeployqt.exe" "$dist\LunarGraze.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler
+          # jurplel/install-qt-action puts Qt's bin dir (windeployqt.exe
+          # included) on PATH itself -- no need to build the path by hand
+          # from an env var (the previous attempt guessed the wrong one,
+          # "Qt6_DIR", which this action never actually sets; the real one
+          # is QT_ROOT_DIR, but PATH already covers it either way).
+          $windeployqt = Get-Command windeployqt.exe -ErrorAction SilentlyContinue
+          if (-not $windeployqt) { throw "windeployqt.exe not found on PATH -- Qt install step may have failed" }
+          & $windeployqt.Source "$dist\LunarGraze.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler
+          if ($LASTEXITCODE -ne 0) { throw "windeployqt exited with code $LASTEXITCODE" }
           Copy-Item hygdata_v41.csv,area_eph_2025_2030.txt,README.md,LICENSE $dist\
           Compress-Archive -Path $dist -DestinationPath LunarGraze-windows-x64.zip
 
